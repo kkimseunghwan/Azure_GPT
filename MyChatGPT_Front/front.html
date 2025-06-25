@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat UI with Bootstrap</title>
+    <meta charset="UTF-8">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        #chat-box {
+            height: 350px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .my-message {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body" id="chat-box">
+                        <p class="other-message">안녕하세요!</p>
+                        <p class="other-message">간단한 채팅 UI 테스트 중입니다.</p>
+                    </div>
+                    <div class="card-footer">
+                        <input type="text" id="message-input" class="form-control" placeholder="메시지를 입력하세요">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 임시 Azure Web PubSub URL
+        // 실제 사용 시에는 이 URL을 적절한 값으로 변경해야함
+        const WEB_SOCKET_URL = 'wss://gptlecturepubsubhwan.webpubsub.azure.com/client/hubs/test_hub?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3c3M6Ly9ncHRsZWN0dXJlcHVic3ViaHdhbi53ZWJwdWJzdWIuYXp1cmUuY29tL2NsaWVudC9odWJzL3Rlc3RfaHViIiwiaWF0IjoxNzUwODM4OTE0LCJleHAiOjE3NTA4NDI1MTQsInJvbGUiOlsid2VicHVic3ViLnNlbmRUb0dyb3VwIiwid2VicHVic3ViLmpvaW5MZWF2ZUdyb3VwIl0sInN1YiI6Imd1ZXN0In0.5aeeOU5_M9DV_gNtYQcnz3ffb33GEM-VD-zRMsThwmo';
+        
+        // URL을 통해 웹소켓에 연결을 하는 클라이언트
+        const pubsubClient = new WebSocket(WEB_SOCKET_URL, 'json.webpubsub.azure.v1');
+
+        // pubsub 클라이언트가 오픈 되었을 때, 실행할 함수
+        pubsubClient.onopen = function(event){
+            console.log('WebSocket connection established:', event);
+            // 연결이 성공적으로 이루어졌을 때, 서버에 메시지를 보낼 수 있습니다.
+            // 예: pubsubClient.send(JSON.stringify({ type: 'joinGroup', groupName: 'test_group' }));
+            pubsubClient.send(
+                JSON.stringify({
+                    type: 'joinGroup',
+                    group: 'group1'
+                })
+            );
+
+        }
+
+        // pubsub 클라이언트가 메세지를 받았을 때, 실행할 함수
+        pubsubClient.onmessage = function(event) {
+            let message = JSON.parse(event.data);
+            console.log('Message received from server:', message);
+            // 받은 메시지를 채팅 박스에 추가
+
+            if (message.data && message.data.trim() !== '') {
+                $('#chat-box').append('<p class="other-message">' + message.data + '</p>');
+                $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+            }
+
+        }
+
+        $(document).ready(function() {
+            $('#message-input').keydown(function(event) {
+	              if (event.isComposing || event.keyCode === 229) {
+                    return;
+                }
+                if (event.key === 'Enter') {
+                    var message = $(this).val();
+                    if (message.trim() !== '') {
+                        $('#chat-box').append('<p class="my-message">' + message + '</p>');
+                        $(this).val('');
+                        $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
