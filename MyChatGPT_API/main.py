@@ -1,4 +1,4 @@
-import token
+# Python Version : 3.11.9
 from typing import Union
 from fastapi import FastAPI
 from dto.question import QuestionRequest
@@ -33,7 +33,7 @@ async def get_pubsub_token(channel_id: str):
         return await pubsub_client.get_client_access_token(
             groups = [ channel_id ],
             minutes_to_expire = 5,
-            role= [ 'webpubsub.joinLeaveGroup.' + channel_id ] 
+            roles = [ 'webpubsub.joinLeaveGroup.' + channel_id ] 
         )
     except Exception as e:
         return {"error": str(e)}
