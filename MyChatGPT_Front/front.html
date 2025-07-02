@@ -35,51 +35,117 @@
     </div>
 
     <script>
-        // 임시 Azure Web PubSub URL
-        // 실제 사용 시에는 이 URL을 적절한 값으로 변경해야함
-        const WEB_SOCKET_URL = 'wss://gptlecturepubsubhwan.webpubsub.azure.com/client/hubs/test_hub?access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3c3M6Ly9ncHRsZWN0dXJlcHVic3ViaHdhbi53ZWJwdWJzdWIuYXp1cmUuY29tL2NsaWVudC9odWJzL3Rlc3RfaHViIiwiaWF0IjoxNzUwODM4OTE0LCJleHAiOjE3NTA4NDI1MTQsInJvbGUiOlsid2VicHVic3ViLnNlbmRUb0dyb3VwIiwid2VicHVic3ViLmpvaW5MZWF2ZUdyb3VwIl0sInN1YiI6Imd1ZXN0In0.5aeeOU5_M9DV_gNtYQcnz3ffb33GEM-VD-zRMsThwmo';
+        // PubSub에 연결하는 방법
+        // 1. channel_id를 받아오고
+        // 2. channel_id로 tocken을 받아온 다음
+        // 3. token으로 웹소켓에 연결
         
-        // URL을 통해 웹소켓에 연결을 하는 클라이언트
-        const pubsubClient = new WebSocket(WEB_SOCKET_URL, 'json.webpubsub.azure.v1');
-
-        // pubsub 클라이언트가 오픈 되었을 때, 실행할 함수
-        pubsubClient.onopen = function(event){
-            console.log('WebSocket connection established:', event);
-            // 연결이 성공적으로 이루어졌을 때, 서버에 메시지를 보낼 수 있습니다.
-            // 예: pubsubClient.send(JSON.stringify({ type: 'joinGroup', groupName: 'test_group' }));
-            pubsubClient.send(
-                JSON.stringify({
-                    type: 'joinGroup',
-                    group: 'group1'
-                })
-            );
-
+        const API_URL = "https://hwangpt-api-function.azurewebsites.net";
+        // const API_URL = "http://localhost:7071"; // 로컬 테스트 용
+        let CHANNEL_ID = null;
+        
+        // 1. channel_id를 받아오기
+        function getChannelID() {
+            return $.ajax({
+                // FastAPI - Channel ID 받아오는 API
+                url: API_URL + '/channel-id',
+                type: 'GET',
+                dataType: 'json'
+            })
+        }
+        // 2. channel_id로 tocken을 받기
+        function getPubSubToken(channelId){
+            return $.ajax({
+                url: API_URL + '/pubsub/token?channel_id=' + channelId,
+                type: 'GET',
+                dataType: 'json'
+            })
         }
 
-        // pubsub 클라이언트가 메세지를 받았을 때, 실행할 함수
-        pubsubClient.onmessage = function(event) {
-            let message = JSON.parse(event.data);
-            console.log('Message received from server:', message);
-            // 받은 메시지를 채팅 박스에 추가
+        // 3. token으로 웹소켓에 연결
+        function connectWebSocket(channelId, token) {
 
-            if (message.data && message.data.trim() !== '') {
-                $('#chat-box').append('<p class="other-message">' + message.data + '</p>');
-                $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+            // Azure Web PubSub URL
+            const WEB_SOCKET_URL = 'wss://gptlecturepubsubhwan.webpubsub.azure.com/client/hubs/dev_hub?access_token=' + token;
+            
+            // URL을 통해 웹소켓에 연결을 하는 클라이언트
+            const pubsubClient = new WebSocket(WEB_SOCKET_URL, 'json.webpubsub.azure.v1');
+
+            // pubsub 클라이언트가 오픈 되었을 때, 실행할 함수
+            pubsubClient.onopen = function(event){
+                console.log('WebSocket connection established:', event);
+                // 연결이 성공적으로 이루어졌을 때, 서버에 메시지를 보낼 수 있습니다.
+                // 예: pubsubClient.send(JSON.stringify({ type: 'joinGroup', groupName: 'test_group' }));
+                pubsubClient.send(
+                    JSON.stringify({
+                        type: 'joinGroup',
+                        group: channelId
+                    })
+                );
+
             }
 
+            // pubsub 클라이언트가 메세지를 받았을 때, 실행할 함수
+            pubsubClient.onmessage = function(event) {
+                let message = JSON.parse(event.data);
+                console.log('Message received from server:', message);
+                // 받은 메시지를 채팅 박스에 추가
+
+                if (message.data && message.data.trim() !== '') {
+                    $('#chat-box').append('<p class="other-message">' + message.data + '</p>');
+                    $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+                }
+
+            }
         }
+        
+
+
+
 
         $(document).ready(function() {
+            getChannelID().then(response => {
+                CHANNEL_ID = response.channel_id
+
+                console.log(CHANNEL_ID)
+
+                return getPubSubToken(CHANNEL_ID)
+            }).then(response => {
+                const token = response.token
+
+                connectWebSocket(CHANNEL_ID, token)
+            })
+
             $('#message-input').keydown(function(event) {
-	              if (event.isComposing || event.keyCode === 229) {
+                if (event.isComposing || event.keyCode === 229) {
                     return;
                 }
                 if (event.key === 'Enter') {
                     var message = $(this).val();
                     if (message.trim() !== '') {
+
                         $('#chat-box').append('<p class="my-message">' + message + '</p>');
-                        $(this).val('');
+                        $(event.target).val('');
                         $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+
+                        $.ajax({
+                            url: API_URL + '/question',
+                            type: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({
+                                channel_id: CHANNEL_ID,
+                                content: message
+                            }),
+                            // POST 요청 성공 시
+                            success: function(response) {
+                                console.log("메세지 전송 성공 : " + message)
+                            },
+                            error: function(xht, status, error) {
+                                console.log("메세지 전송 실패 : ", error)
+                                $('#chat-box').append('<p class="my-message">' + "메세지 전송 실패" + '</p>');
+
+                            }
+                        });
                     }
                 }
             });
