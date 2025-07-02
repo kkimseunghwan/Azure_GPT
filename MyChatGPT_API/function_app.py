@@ -5,6 +5,7 @@ from dto.question import QuestionRequest
 from azure.messaging.webpubsubservice.aio import WebPubSubServiceClient
 from azure.core.credentials import AzureKeyCredential
 from fastapi.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import azure.functions as func
 import uuid
@@ -14,6 +15,9 @@ import uuid
 pubsub_client = WebPubSubServiceClient(endpoint=os.environ['PUBSUB_CONNECTION_URL'], 
                                        hub=os.environ['PUBSUB_HUB'], 
                                        credential=AzureKeyCredential(os.environ['PUBSUB_KEY']))
+
+db_client = AsyncIOMotorClient(os.environ['DB_CONNECTION_URL'])
+db = db_client['myGPT']
 
 fast_app = FastAPI()
 fast_app.add_middleware(
@@ -27,7 +31,12 @@ app = func.AsgiFunctionApp(app=fast_app , http_auth_level=func.AuthLevel.ANONYMO
 # 질문 API
 @fast_app.post("/question")
 async def send_question(request: QuestionRequest):
-    return request
+    result = await db.messages.insert_one({
+        "channel_id": request.channel_id,
+        "content": request.content
+    })
+    # result.inserted_id: 기본적으로 str이 아님
+    return str(result.inserted_id)
 
 # 랜덤한 채널 아이디 생성
 @fast_app.get("/channel-id")
