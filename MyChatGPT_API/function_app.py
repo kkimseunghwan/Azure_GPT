@@ -44,6 +44,8 @@ async def get_channel_id():
     return {"channel_id": str(uuid.uuid4())}
     # TODO: 혹시 모를 상황을 대비해, DB에 중복된 채널값이 있으면 재생성 필요
 
+    
+
 # Pubsub 토큰을 발급하는 API
 @fast_app.get("/pubsub/token")
 async def get_pubsub_token(channel_id: str):
