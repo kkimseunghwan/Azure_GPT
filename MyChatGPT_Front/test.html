@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPT 챗봇</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JQuery CDN -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* 커스텀 스크롤바 (선택 사항) */
+        #chat-box::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chat-box::-webkit-scrollbar-track {
+            background: #f1f5f9; /* slate-100 */
+        }
+        #chat-box::-webkit-scrollbar-thumb {
+            background: #94a3b8; /* slate-400 */
+            border-radius: 4px;
+        }
+        #chat-box::-webkit-scrollbar-thumb:hover {
+            background: #64748b; /* slate-500 */
+        }
+        
+        /* --- 레이아웃 수정 부분 --- */
+        /* html, body가 전체 높이를 차지하도록 설정하여 레이아웃 문제 해결 */
+        html, body {
+            height: 100%;
+        }
+
+        /* body에 패딩을 추가하고, 패딩이 높이에 포함되도록 box-sizing 설정 */
+        body {
+            padding: 2rem;
+            box-sizing: border-box; /* 패딩과 보더를 요소의 너비와 높이에 포함시킴 */
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <!-- h-full은 이제 body의 100% 높이를 차지하게 됨 (패딩 제외) -->
+    <div class="flex flex-col h-full max-w-4xl mx-auto bg-white shadow-2xl rounded-2xl overflow-hidden">
+        <!-- Header: 색상 변경 (blue -> teal/cyan) -->
+        <header class="bg-gradient-to-r from-teal-500 to-cyan-600 text-white p-4 shadow-md z-10">
+            <h1 class="text-2xl font-bold text-center">HWAN GPT 챗봇</h1>
+        </header>
+
+        <!-- Chat Box -->
+        <main id="chat-box" class="flex-1 p-6 overflow-y-auto bg-slate-50">
+            <!-- 초기 메시지 -->
+            <div class="flex items-start gap-3 my-4 animate-fade-in">
+                <img src="https://placehold.co/40x40/94a3b8/ffffff?text=GPT" alt="GPT Avatar" class="w-10 h-10 rounded-full shadow-md">
+                <div class="bg-slate-200 text-slate-800 p-3 rounded-xl max-w-lg">
+                    <p class="text-sm">안녕하세요! 무엇을 도와드릴까요?</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Message Input -->
+        <footer class="bg-white border-t border-slate-200 p-4">
+            <div class="flex items-center bg-slate-100 rounded-full px-2 py-1">
+                <input type="text" id="message-input" class="flex-1 bg-transparent border-none rounded-full py-2 px-4 focus:outline-none text-slate-700 placeholder-slate-400" placeholder="메시지를 입력하세요...">
+                <!-- 보내기 버튼 색상 변경 -->
+                <button id="send-button" class="ml-2 bg-teal-500 hover:bg-teal-600 text-white font-bold p-3 rounded-full transition-transform duration-200 ease-in-out hover:scale-110 focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 원본 스크립트의 핵심 로직은 그대로 유지합니다.
+        const API_URL = "https://hwangpt-api-function.azurewebsites.net";
+        // const API_URL = "http://localhost:7071"; // 로컬 테스트 용
+        let CHANNEL_ID = null;
+
+        // --- Helper Functions for UI ---
+
+        // 내 메시지를 화면에 추가하는 함수 (색상 변경)
+        function appendMyMessage(message) {
+            const sanitizedMessage = $('<div/>').text(message).html();
+            const messageHtml = `
+                <div class="flex flex-row-reverse items-start gap-3 my-4">
+                    <img src="https://placehold.co/40x40/14b8a6/ffffff?text=ME" alt="My Avatar" class="w-10 h-10 rounded-full shadow-md">
+                    <div class="bg-teal-500 text-white p-3 rounded-xl max-w-lg">
+                        <p class="text-sm">${sanitizedMessage}</p>
+                    </div>
+                </div>`;
+            $('#chat-box').append(messageHtml);
+            scrollToBottom();
+        }
+
+        // 상대방(GPT) 메시지를 화면에 추가하는 함수
+        function appendOtherMessage(message) {
+            const sanitizedMessage = $('<div/>').text(message).html();
+            const messageHtml = `
+                <div class="flex items-start gap-3 my-4">
+                    <img src="https://placehold.co/40x40/94a3b8/ffffff?text=GPT" alt="GPT Avatar" class="w-10 h-10 rounded-full shadow-md">
+                    <div class="bg-slate-200 text-slate-800 p-3 rounded-xl max-w-lg">
+                        <p class="text-sm">${sanitizedMessage}</p>
+                    </div>
+                </div>`;
+            $('#chat-box').append(messageHtml);
+            scrollToBottom();
+        }
+        
+        // 시스템 메시지를 화면에 추가하는 함수
+        function appendSystemMessage(message) {
+            const sanitizedMessage = $('<div/>').text(message).html();
+            const messageHtml = `
+                <div class="text-center my-4">
+                    <p class="text-xs text-slate-400">${sanitizedMessage}</p>
+                </div>`;
+             $('#chat-box').append(messageHtml);
+            scrollToBottom();
+        }
+
+        // 채팅창 스크롤을 맨 아래로 내리는 함수
+        function scrollToBottom() {
+            $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+        }
+
+        // --- Core Communication Logic (Original) ---
+
+        // 1. channel_id를 받아오기
+        function getChannelID() {
+            return $.ajax({
+                url: API_URL + '/channel-id',
+                type: 'GET',
+                dataType: 'json'
+            });
+        }
+        
+        // 2. channel_id로 token을 받기
+        function getPubSubToken(channelId){
+            return $.ajax({
+                url: API_URL + '/pubsub/token?channel_id=' + channelId,
+                type: 'GET',
+                dataType: 'json'
+            });
+        }
+
+        // 3. token으로 웹소켓에 연결
+        function connectWebSocket(channelId, token) {
+            const WEB_SOCKET_URL = 'wss://gptlecturepubsubhwan.webpubsub.azure.com/client/hubs/dev_hub?access_token=' + token;
+            const pubsubClient = new WebSocket(WEB_SOCKET_URL, 'json.webpubsub.azure.v1');
+
+            pubsubClient.onopen = function(event){
+                console.log('WebSocket connection established:', event);
+                appendSystemMessage('서버에 연결되었습니다.');
+                pubsubClient.send(
+                    JSON.stringify({
+                        type: 'joinGroup',
+                        group: channelId
+                    })
+                );
+            };
+
+            pubsubClient.onmessage = function(event) {
+                let message = JSON.parse(event.data);
+                console.log('Message received from server:', message);
+                if (message.data && message.data.content && message.data.content.trim() !== '') {
+                    appendOtherMessage(message.data.content);
+                }
+            };
+
+            pubsubClient.onerror = function(event) {
+                console.error("WebSocket Error:", event);
+                appendSystemMessage('연결에 오류가 발생했습니다. 페이지를 새로고침 해주세요.');
+            };
+            
+            pubsubClient.onclose = function(event) {
+                console.log("WebSocket connection closed:", event);
+                appendSystemMessage('서버와 연결이 끊어졌습니다.');
+            };
+        }
+
+        // 4. 이전 대화 내용을 가져오는 함수
+        function getChatHistory(channelId) {
+            $.ajax({
+                url: API_URL + '/history/' + channelId,
+                type: 'GET',
+                success: function(messages) {
+                    $('#chat-box').empty(); // 기존 메시지 초기화
+                    messages.forEach(function(message) {
+                        if (message.type === 'question') {
+                            appendMyMessage(message.content);
+                        } else {
+                            appendOtherMessage(message.content);
+                        }
+                    });
+                    scrollToBottom();
+                },
+                error: function(error) {
+                    console.error("채팅 기록 로딩 실패:", error);
+                    appendSystemMessage('이전 대화 기록을 불러오는 데 실패했습니다.');
+                }
+            });
+        }
+
+        // 메시지 전송 함수
+        function sendMessage() {
+            const messageInput = $('#message-input');
+            const message = messageInput.val();
+            
+            if (message.trim() !== '') {
+                appendMyMessage(message);
+                messageInput.val('');
+
+                $.ajax({
+                    url: API_URL + '/question',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        channel_id: CHANNEL_ID,
+                        content: message
+                    }),
+                    success: function(response) {
+                        console.log("메시지 전송 성공: " + message);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("메시지 전송 실패: ", error);
+                        appendSystemMessage('메시지 전송에 실패했습니다.');
+                    }
+                });
+            }
+        }
+
+        // --- Document Ready - Initializer ---
+
+        $(document).ready(function() {
+            getChannelID().then(response => {
+                CHANNEL_ID = response.channel_id;
+                console.log("Channel ID:", CHANNEL_ID);
+                appendSystemMessage(`채널 ID(${CHANNEL_ID})를 받았습니다.`);
+                
+                return getPubSubToken(CHANNEL_ID);
+            }).then(response => {
+                const token = response.token;
+                console.log("PubSub Token received.");
+                
+                connectWebSocket(CHANNEL_ID, token);
+                // getChatHistory(CHANNEL_ID);
+
+            }).catch(error => {
+                console.error("Initialization failed:", error);
+                appendSystemMessage("초기화에 실패했습니다. API 서버가 실행 중인지 확인해주세요.");
+            });
+
+            // 엔터 키로 메시지 전송
+            $('#message-input').keydown(function(event) {
+                if (event.key === 'Enter' && !event.isComposing) {
+                    event.preventDefault(); // form 전송 방지
+                    sendMessage();
+                }
+            });
+
+            // 보내기 버튼 클릭으로 메시지 전송
+            $('#send-button').on('click', function() {
+                sendMessage();
+            });
+            
+            // 초기 화면 스크롤
+            scrollToBottom();
+        });
+    </script>
+</body>
+</html>

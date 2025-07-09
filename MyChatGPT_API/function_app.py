@@ -11,6 +11,25 @@ from util.servicebus import servicebus_client
 from util.pubsub import pubsub_client
 from util.database import db
 
+# TODO: 
+#   기존 채팅방 내용 가져오기
+#   - channel_id를 통해 가져오기
+#   - 기존 내용에 이어서 질문 가능하도록 
+
+#   DB인덱싱 (완료)
+#   - 소모되는 RU 감소
+#   - 자주 쓰는 필드에 대해 인덱싱
+
+#   GPT 답변 Stream 형식으로 받기
+#   - 답변 한글자씩 출력되도록
+
+#   Agent 로직 추가
+#   - 영문 답변을 더 잘 대답해줌
+#   - 번역 API를 통해 질문을 영문 번역 후 요청
+
+# 추가
+# - UI변경
+# 
 
 fast_app = FastAPI()
 fast_app.add_middleware(
@@ -66,6 +85,23 @@ async def get_pubsub_token(channel_id: str):
             minutes_to_expire = 5,
             roles = [ 'webpubsub.joinLeaveGroup.' + channel_id ] 
         )
+    except Exception as e:
+        return {"error": str(e)}
+
+# 채팅 기록을 조회
+@fast_app.get("/history/{channel_id}")
+async def get_history(channel_id: str, limit: int = 100):
+    try:
+        # 채널 아이디로 메세지 조회 + _id 필드를 기준으로 시간 순서대로 정렬
+        history = db.messages.find({"channel_id": channel_id}).sort("_id", -1).limit(limit)
+        
+        # 결과를 리스트로 변환
+        result = []
+        async for message in history:
+            message['_id'] = str(message['_id'])  # ObjectId를 str로 변환 (JSON 직렬화 오류 방지)
+            result.append(message)
+
+        return result
     except Exception as e:
         return {"error": str(e)}
 
