@@ -40,8 +40,8 @@
         // 2. channel_id로 tocken을 받아온 다음
         // 3. token으로 웹소켓에 연결
         
-        // const API_URL = "https://hwangpt-api-function.azurewebsites.net";
-        const API_URL = "http://localhost:7071"; // 로컬 테스트 용
+        const API_URL = "https://hwangpt-api-function.azurewebsites.net";
+        // const API_URL = "http://localhost:7071"; // 로컬 테스트 용
         let CHANNEL_ID = null;
         
         // 1. channel_id를 받아오기
@@ -91,8 +91,8 @@
                 console.log('Message received from server:', message);
                 // 받은 메시지를 채팅 박스에 추가
 
-                if (message.data && message.data.trim() !== '') {
-                    $('#chat-box').append('<p class="other-message">' + message.data + '</p>');
+                if (message.data && message.data.content !== '') {
+                    $('#chat-box').append('<p class="other-message">' + message.data.content + '</p>');
                     $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
                 }
 
