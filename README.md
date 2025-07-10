@@ -1,5 +1,6 @@
 ## Azure 기반 OpenAI 채팅 에이전트
-이 프로젝트는 Microsoft Azure의 다양한 서버리스 서비스와 OpenAI의 GPT 모델을 결합하여 구축한 실시간 웹 채팅 애플리케이션입니다. 사용자의 메시지에 대해 AI가 응답하고, 대화 내용은 Cosmos DB에 저장됩니다.
+이 프로젝트는 Microsoft Azure의 다양한 서버리스 서비스와 OpenAI의 GPT 모델을 결합하여 구축한 실시간 웹 채팅 애플리케이션입니다. 
+사용자의 메시지에 대해 AI가 응답하고, 대화 내용은 Cosmos DB에 저장됩니다.
 
 ## 주요 아키텍처
 ![제목 없는 다이어그램](https://github.com/user-attachments/assets/c5a20c26-cb13-47be-895f-18d68a219302)
